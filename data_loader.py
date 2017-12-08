@@ -12,7 +12,7 @@ class InteractionsSampler(Dataset):
 
     def __init__(self, sequences, sequence_lengths,
                  template_size=70, query_size=10,
-                 min_nb_interactions=50, perturb_prob=0.0):
+                 min_nb_interactions=50, num_negative=1000,perturb_prob=0.0):
 
         include = np.argwhere(sequence_lengths > min_nb_interactions).ravel()
         self.template_size = template_size
@@ -20,6 +20,7 @@ class InteractionsSampler(Dataset):
         self.sequences = sequences[include]
         self.lengths = sequence_lengths[include]
         self.max_length = sequences.shape[-1]
+        self.num_negative = num_negative
         self.num_items = int(np.max(sequences) + 3)  # plus 2 tokens {BOS, EOS}
         print('Loaded dataset of shape:{}\n'
               'Number of unique items: {}'.format(
@@ -66,13 +67,16 @@ class InteractionsSampler(Dataset):
         positive = [self.num_items - 2] + \
             list(sequence[split:split + query_size]) + [self.num_items - 1]
         positive = np.array(positive)
-
-        negative = list(np.random.choice(
-            self.num_items - 2, query_size, replace=False))
+        
+        # negative = list(np.random.choice(
+        #  self.num_items - 2, query_size*2, replace=False))
         # add BOS/ EOS
-        negative = np.array([self.num_items - 2] +
-                            negative + [self.num_items - 1])
+        negative_ = np.setdiff1d(np.arange(self.num_items), np.array(self.sequences[index]))
 
+        negative = np.random.choice(negative_, self.num_negative, replace=False)
+        # negative = np.array([self.num_items - 2] + negative + [self.num_items - 1])
+        
+        
         user_interactions = torch.from_numpy(user_interactions.astype(np.int64))
         positive = torch.from_numpy(positive.astype(np.int64))
         negative = torch.from_numpy(negative.astype(np.int64))
